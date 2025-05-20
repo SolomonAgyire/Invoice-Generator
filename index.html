@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Casey's Invoice Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3B82F6">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+</head>
+<body class="min-h-screen py-12">
+    <!-- Navbar -->
+    <nav class="glass-card fixed top-0 left-0 right-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <span class="text-xl font-bold text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-500">Invoice Generator</span>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="nav-link active" data-page="home">
+                        <span class="relative z-10">Home</span>
+                    </a>
+                    <a href="#" class="nav-link" data-page="history">
+                        <span class="relative z-10">History</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
+        <!-- Home Page -->
+        <div id="homePage" class="page active">
+            <div class="glass-card rounded-xl p-8 mb-8">
+                <h1 class="text-3xl font-bold text-center mb-8 text-gray-800">Create New Invoice</h1>
+                
+                <form id="invoiceForm" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="clientName" class="block text-sm font-medium text-gray-700 mb-2">Client Name</label>
+                            <input type="text" id="clientName" placeholder="Enter client name" class="w-full p-3 border rounded-lg" required />
+                        </div>
+                        <div>
+                            <label for="clientAddress" class="block text-sm font-medium text-gray-700 mb-2">Client Address</label>
+                            <input type="text" id="clientAddress" placeholder="Enter client address" class="w-full p-3 border rounded-lg" required />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="invoiceDate" class="block text-sm font-medium text-gray-700 mb-2">Invoice Date</label>
+                        <input type="date" id="invoiceDate" class="w-full p-3 border rounded-lg" required />
+                    </div>
+
+                    <div id="itemsContainer" class="bg-gray-50 p-6 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-4 text-gray-800">Invoice Details</h3>
+                        <div class="item-row grid grid-cols-12 gap-4 mb-4">
+                            <div class="col-span-7">
+                                <input type="text" placeholder="Description" class="w-full p-3 border rounded-lg" required />
+                            </div>
+                            <div class="col-span-4">
+                                <input type="text" placeholder="Amount" class="w-full p-3 border rounded-lg money-input" required />
+                            </div>
+                            <div class="col-span-1">
+                                <button type="button" class="remove-item bg-red-500 text-white px-3 py-3 rounded-lg hover:bg-red-600 w-full flex items-center justify-center" title="Remove this line">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" id="addItem" class="btn bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 w-full md:w-auto">Add Item</button>
+
+                    <div class="flex justify-between space-x-4">
+                        <button type="button" onclick="generateInvoice()" class="btn bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 flex-1">Generate Invoice</button>
+                        <button type="reset" class="btn bg-red-500 text-white px-6 py-3 rounded-lg hover:bg-red-600 flex-1">Reset</button>
+                    </div>
+                </form>
+
+                <div class="overlay" id="previewOverlay"></div>
+                <div id="invoicePreview">
+                    <div class="preview-header">
+                        <span>Invoice Preview</span>
+                        <button onclick="closePreview()" class="btn bg-gray-500 text-white px-3 py-1 rounded">Close</button>
+                    </div>
+                    <div class="preview-content">
+                        <div class="invoice-header flex items-center mb-4">
+                            <img src="logo.png" alt="Company Logo" class="h-12 w-12 object-contain rounded mr-3" />
+                            <div>
+                                <h2 class="text-lg font-bold">Precision Handyman Solutions, LLC.</h2>
+                                <p class="text-sm text-yellow-500">(334-328-6093)</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <h3 class="font-medium">Bill To:</h3>
+                                <p id="previewClientName" class="font-semibold"></p>
+                                <p id="previewClientAddress" class="text-gray-600"></p>
+                            </div>
+                            <div class="text-right">
+                                <p><strong>Invoice #: </strong><span id="invoiceNumber"></span></p>
+                                <p><strong>Date: </strong><span id="previewDate"></span></p>
+                            </div>
+                        </div>
+
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="text-left py-2">Description</th>
+                                    <th class="text-right py-2">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewItems">
+                            </tbody>
+                            <tfoot>
+                                <tr class="border-t">
+                                    <td class="text-right py-2"><strong>Total:</strong></td>
+                                    <td class="text-right py-2"><strong>$<span id="previewTotal"></span></strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Page -->
+        <div id="historyPage" class="page hidden">
+            <div class="glass-card rounded-xl p-8">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800">Invoice History</h2>
+                <div class="table-container">
+                    <table class="w-full">
+                        <thead class="table-header">
+                            <tr class="border-b">
+                                <th class="text-left py-3 px-4">Invoice #</th>
+                                <th class="text-left py-3 px-4">Client</th>
+                                <th class="text-left py-3 px-4">Date</th>
+                                <th class="text-right py-3 px-4">Amount</th>
+                                <th class="text-center py-3 px-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoiceList">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Preview Modal -->
+    <div id="invoicePreviewModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden modal-backdrop">
+        <div class="glass-card rounded-xl p-8 max-w-2xl w-full relative modal-content">
+            <button id="closePreviewModal" class="absolute top-4 right-4 text-gray-500 hover:text-red-500 text-2xl font-bold transition-colors">&times;</button>
+            <div id="modalInvoicePreview" class="transform transition-all duration-300"></div>
+            <div class="flex justify-end mt-6 space-x-4">
+                <button onclick="document.getElementById('emailModal').classList.remove('hidden')" class="btn bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-all duration-300">
+                    <span class="relative z-10">Send Email</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email Modal -->
+    <div id="emailModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden modal-backdrop">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="glass-card rounded-xl p-8 max-w-md w-full modal-content">
+                <h3 class="text-xl font-bold mb-6 text-gray-800">Send Invoice</h3>
+                <form id="emailForm" class="space-y-6">
+                    <div class="transform transition-all duration-300 hover:translate-y-[-2px]">
+                        <label for="senderEmail" class="block text-sm font-medium text-gray-700 mb-2">Your Email</label>
+                        <input type="email" id="senderEmail" class="w-full p-3 border rounded-lg transition-all duration-300" required />
+                    </div>
+                    <div class="transform transition-all duration-300 hover:translate-y-[-2px]">
+                        <label for="clientEmail" class="block text-sm font-medium text-gray-700 mb-2">Client Email</label>
+                        <input type="email" id="clientEmail" class="w-full p-3 border rounded-lg transition-all duration-300" required />
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button type="button" onclick="closeEmailModal()" class="btn bg-gray-500 text-white px-6 py-3 rounded-lg hover:bg-gray-600 transition-all duration-300">
+                            <span class="relative z-10">Cancel</span>
+                        </button>
+                        <button type="submit" class="btn bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition-all duration-300">
+                            <span class="relative z-10">Send</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
