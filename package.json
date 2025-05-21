@@ -1,0 +1,16 @@
+{
+  "name": "invoice-generator",
+  "version": "1.0.0",
+  "description": "A modern, responsive web application for generating professional invoices. Built with HTML, CSS, and JavaScript, using Tailwind CSS for styling.",
+  "main": "csp-config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

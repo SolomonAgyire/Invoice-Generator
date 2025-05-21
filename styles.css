@@ -499,7 +499,44 @@ input:focus {
     }
 }
 
-/* Responsive Design */
+/* Clickable invoice rows for all screen sizes */
+.hint {
+    display: block;
+    background-color: rgba(59, 130, 246, 0.1);
+    padding: 8px;
+    border-radius: 4px;
+    border-left: 3px solid #3B82F6;
+    margin-bottom: 16px;
+}
+
+/* Hide the mobile-hint class as we're replacing it */
+.mobile-hint {
+    display: none;
+}
+
+#invoiceList .invoice-row {
+    cursor: pointer !important;
+    position: relative;
+    transition: background-color 0.2s ease;
+}
+
+#invoiceList .invoice-row:hover,
+#invoiceList .invoice-row:active {
+    background-color: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Add visual indicator for clickable rows */
+#invoiceList .invoice-row::after {
+    content: '›';
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #3B82F6;
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
 @media (max-width: 768px) {
     .glass-card {
         margin: 1rem;
@@ -557,4 +594,65 @@ nav.glass-card {
     max-height: 80vh !important;
     margin: 20px;
     overflow: hidden;
+}
+
+/* Hide mobile hint on desktop */
+.mobile-hint {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .mobile-hint {
+        display: block;
+    }
+    
+    #invoiceList .invoice-row {
+        cursor: pointer;
+        position: relative;
+    }
+    
+    #invoiceList .invoice-row::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1; /* Above the table cell content but below action buttons */
+    }
+    
+    #invoiceList .action-buttons-cell {
+        display: none !important;
+    }
+}
+
+/* Modal action buttons styles - Enhanced to guarantee visibility */
+#modalActionButtons {
+    display: flex !important;
+    justify-content: flex-end !important;
+    margin-top: 1.5rem !important;
+    padding-top: 1rem !important;
+    border-top: 2px solid rgba(0, 0, 0, 0.1) !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    position: relative !important;
+    z-index: 20 !important;
+}
+
+#modalActionButtons .btn {
+    min-width: 80px;
+    opacity: 1 !important;
+    visibility: visible !important;
+    text-align: center;
+    position: relative;
+    z-index: 30 !important;
+}
+
+/* Remove old styles */
+#invoicePreviewModal .flex.justify-end {
+    display: flex !important; 
+}
+
+#invoicePreviewModal .btn {
+    min-width: 80px;
+    text-align: center;
 } 

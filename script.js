@@ -3,6 +3,11 @@ let db;
 const dbName = "InvoiceDB";
 const request = indexedDB.open(dbName, 1);
 
+// Global variable to store the current invoice ID
+let currentInvoiceId = null;
+
+
+
 request.onerror = (event) => {
     console.error("Database error: " + event.target.error);
 };
@@ -16,25 +21,25 @@ request.onupgradeneeded = (event) => {
 
 request.onsuccess = (event) => {
     db = event.target.result;
+    console.log("Database loaded successfully");
     loadInvoices(); // Load existing invoices when database is ready
 };
 
 // Initialize the first item row
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize EmailJS
-    emailjs.init("YOUR_PUBLIC_KEY"); // Replace with your actual public key
-
     // Set default date to today (local time)
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dateInput = document.getElementById('invoiceDate');
+    if (dateInput) {
     dateInput.valueAsDate = today;
+    }
     
     // Add event listeners for the first item row
-    setupItemRow(document.querySelector('.item-row'));
-
-    // Setup email form
-    setupEmailForm();
+    const firstItemRow = document.querySelector('.item-row');
+    if (firstItemRow) {
+        setupItemRow(firstItemRow);
+    }
 
     // Navigation
     const navLinks = document.querySelectorAll('.nav-link');
@@ -44,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             const targetPage = link.getAttribute('data-page');
+            console.log("Navigating to page:", targetPage);
 
             // Update active states
             navLinks.forEach(l => l.classList.remove('active'));
@@ -54,11 +60,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 page.classList.remove('active');
                 if (page.id === `${targetPage}Page`) {
                     page.classList.add('active');
+                    console.log("Activated page:", page.id);
                 }
             });
 
             // If navigating to history, refresh the list
             if (targetPage === 'history') {
+                console.log("Loading invoices for history page");
                 loadInvoices();
             }
         });
@@ -74,7 +82,7 @@ document.getElementById('addItem').addEventListener('click', function() {
     newRow.style.transform = 'translateY(20px)';
     newRow.innerHTML = `
         <div class="col-span-7">
-            <input type="text" placeholder="Description" class="w-full p-3 border rounded-lg" required />
+            <textarea placeholder="Description" class="w-full p-3 border rounded-lg" rows="2" required></textarea>
         </div>
         <div class="col-span-4">
             <input type="text" placeholder="Amount" class="w-full p-3 border rounded-lg money-input" required />
@@ -143,93 +151,6 @@ function setupItemRow(row) {
     });
 }
 
-// Setup email form
-function setupEmailForm() {
-    const emailForm = document.getElementById('emailForm');
-    emailForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const senderEmail = document.getElementById('senderEmail').value;
-        const clientEmail = document.getElementById('clientEmail').value;
-        const invoiceId = this.dataset.invoiceId;
-        
-        // Show loading state
-        const submitButton = emailForm.querySelector('button[type="submit"]');
-        const originalText = submitButton.textContent;
-        submitButton.disabled = true;
-        submitButton.textContent = 'Sending...';
-        
-        try {
-            await sendInvoiceEmail(invoiceId, senderEmail, clientEmail);
-            alert('Invoice sent successfully!');
-            closeEmailModal();
-        } catch (error) {
-            console.error('Error sending email:', error);
-            alert('Failed to send email. Please try again.');
-        } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = originalText;
-        }
-    });
-}
-
-// Send invoice email
-async function sendInvoiceEmail(invoiceId, senderEmail, clientEmail) {
-    const invoice = await getInvoice(invoiceId);
-    if (!invoice) throw new Error('Invoice not found');
-
-    // Create PDF
-    const element = document.getElementById('modalInvoicePreview');
-    const opt = {
-        margin: 1,
-        filename: `invoice-${invoice.invoiceNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    try {
-        const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
-        const pdfBase64 = await blobToBase64(pdfBlob);
-
-        // Send email using EmailJS
-        const templateParams = {
-            from_email: senderEmail,
-            to_email: clientEmail,
-            invoice_number: invoice.invoiceNumber,
-            client_name: invoice.clientName,
-            company_name: "Precision Handyman Solutions, LLC.",
-            invoice_date: formatDate(invoice.date),
-            invoice_total: invoice.total,
-            pdf_attachment: pdfBase64
-        };
-
-        await emailjs.send(
-            "YOUR_SERVICE_ID", // Replace with your EmailJS service ID
-            "YOUR_TEMPLATE_ID", // Replace with your EmailJS template ID
-            templateParams
-        );
-    } catch (error) {
-        console.error('Error in sendInvoiceEmail:', error);
-        throw error;
-    }
-}
-
-// Helper function to convert Blob to Base64
-function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
-}
-
-// Function to close email modal
-function closeEmailModal() {
-    document.getElementById('emailModal').classList.add('hidden');
-    document.getElementById('emailForm').reset();
-}
-
 // Load invoices from database
 function loadInvoices() {
     const transaction = db.transaction(["invoices"], "readonly");
@@ -246,21 +167,36 @@ function loadInvoices() {
 function displayInvoices(invoices) {
     const invoiceList = document.getElementById('invoiceList');
     invoiceList.innerHTML = '';
+    
+    console.log('Setting up clickable invoice rows');
 
     invoices.forEach(invoice => {
         const tr = document.createElement('tr');
-        tr.className = 'border-b hover:bg-gray-50';
+        tr.className = 'border-b hover:bg-gray-50 invoice-row';
+        tr.setAttribute('data-invoice-id', invoice.id);
+        
+        // Make row clickable on all screen sizes
+        tr.style.cursor = 'pointer';
+        
+        // Add click handler for the row
+        tr.addEventListener('click', function(e) {
+            console.log('Row clicked!', invoice.id);
+            
+            // Add visual feedback
+            this.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+            setTimeout(() => {
+                this.style.backgroundColor = '';
+            }, 300);
+            
+            previewInvoice(invoice.id);
+        }, true); // Use capture phase for earlier interception
+        
         tr.innerHTML = `
             <td class="py-2">${invoice.invoiceNumber}</td>
             <td class="py-2">${invoice.clientName}</td>
             <td class="py-2">${formatDate(invoice.date)}</td>
-            <td class="py-2">$${invoice.total}</td>
-            <td class="py-2 flex flex-wrap gap-2 justify-center">
-                <button onclick="previewInvoice(${invoice.id})" class="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">Preview</button>
-                <button onclick="downloadInvoice(${invoice.id})" class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">Download</button>
-                <button onclick="deleteInvoice(${invoice.id})" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Delete</button>
-            </td>
         `;
+        
         invoiceList.appendChild(tr);
     });
 }
@@ -295,13 +231,36 @@ function getInvoice(id) {
 
 // Preview invoice in modal popup
 window.previewInvoice = async function(id) {
+    console.log("Opening preview for invoice ID:", id);
     const invoice = await getInvoice(id);
-    if (!invoice) return;
+    if (!invoice) {
+        console.error("Invoice not found:", id);
+        return;
+    }
+
+    // Store the current invoice ID globally
+    currentInvoiceId = id;
+    console.log("Set currentInvoiceId to:", currentInvoiceId);
+
     renderModalInvoicePreview(invoice);
-    document.getElementById('invoicePreviewModal').classList.remove('hidden');
     
-    // Update email form with invoice ID
-    document.getElementById('emailForm').dataset.invoiceId = id;
+    // Add a small delay to ensure DOM is updated before showing the modal
+    setTimeout(() => {
+        const modal = document.getElementById('invoicePreviewModal');
+        modal.classList.remove('hidden');
+    
+        // Make sure buttons container is visible
+        const buttonsContainer = modal.querySelector('.flex.justify-end');
+        if (buttonsContainer) {
+            console.log("Found buttons container:", buttonsContainer);
+            buttonsContainer.style.display = 'flex';
+            buttonsContainer.style.marginTop = '20px';
+            buttonsContainer.style.paddingTop = '10px';
+            buttonsContainer.style.borderTop = '2px solid #e5e7eb';
+        } else {
+            console.error("Buttons container not found");
+        }
+    }, 100);
 }
 
 // Render invoice preview in modal
@@ -336,7 +295,7 @@ function renderModalInvoicePreview(invoice) {
                 <tbody>
                     ${invoice.items.map(item => `
                         <tr class="border-b hover:bg-gray-50 transition-colors">
-                            <td class="py-2 px-4">${item.description}</td>
+                            <td class="py-2 px-4">${item.description.replace(/\n/g, '<br>')}</td>
                             <td class="text-right py-2 px-4">$${parseFloat(item.amount).toFixed(2)}</td>
                         </tr>
                     `).join('')}
@@ -353,12 +312,27 @@ function renderModalInvoicePreview(invoice) {
             <p class="mb-1">Thank you for your business!</p>
             <p class="text-xs">Please make checks payable to: Precision Handyman Solutions, LLC.</p>
         </div>
+        
+        <!-- Action Buttons directly in the invoice content -->
+        <div class="mt-6 pt-4 border-t border-gray-200 flex justify-end space-x-4">
+            <button onclick="deleteInvoice(${invoice.id})" class="btn bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+                Delete
+            </button>
+            <button onclick="downloadInvoice(${invoice.id})" class="btn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                Download
+            </button>
+        </div>
     `;
 }
 
-// Close modal functionality
-document.getElementById('closePreviewModal').addEventListener('click', function() {
+// Close modal functionality - Modified to handle possible click events better
+document.addEventListener('DOMContentLoaded', function() {
+    const closeButton = document.getElementById('closePreviewModal');
+    if (closeButton) {
+        closeButton.addEventListener('click', function() {
     document.getElementById('invoicePreviewModal').classList.add('hidden');
+        });
+    }
 });
 
 // Delete invoice with animation
@@ -398,21 +372,253 @@ window.deleteInvoice = async function(id) {
     }
 };
 
-// Add new download function
+// PDF download function that avoids canvas taint issues
 window.downloadInvoice = async function(id) {
+    console.log("Download button clicked for invoice ID:", id);
+    try {
+        // First make sure we have the jsPDF library
+        if (typeof jspdf === 'undefined') {
+            console.error("jsPDF library not found");
+            alert("PDF generation library not loaded. Please refresh and try again.");
+            return;
+        }
+        
     const invoice = await getInvoice(id);
-    if (!invoice) return;
-    
-    renderModalInvoicePreview(invoice);
-    const element = document.getElementById('modalInvoicePreview');
-    const opt = {
-        margin: 1,
-        filename: `invoice-${invoice.invoiceNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    html2pdf().from(element).set(opt).save();
+    if (!invoice) {
+            console.error("Invoice not found for download:", id);
+        return;
+    }
+
+        // Create PDF 
+        console.log("Creating PDF...");
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF();
+        
+        // PDF settings
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 20;
+        let y = margin;
+        
+        // Color palette
+        const primaryColor = [13, 110, 253]; // Brighter blue
+        const secondaryColor = [255, 140, 0]; // Orange
+        const accentColor = [0, 128, 0]; // Green for total/positive amounts
+        const grayColor = [75, 85, 99]; // Dark gray
+        const bgLight = [248, 249, 250]; // Light background
+        const bgMedium = [233, 236, 239]; // Medium background
+        
+        // Logo section removed
+        
+        // Start y position for the company header
+        const y_start = margin;
+        
+        // Company header - with better spacing
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(22);
+        pdf.setTextColor(...primaryColor);
+        const companyName = "Precision Handyman Solutions, LLC.";
+        const companyNameWidth = pdf.getTextWidth(companyName);
+        pdf.text(companyName, (pageWidth - companyNameWidth) / 2, y_start);
+        y = y_start + 12;
+        
+        // Phone number directly under company name
+        pdf.setFontSize(14);
+        pdf.setTextColor(...secondaryColor);
+        const phoneNumber = "(334-328-6093)";
+        const phoneNumberWidth = pdf.getTextWidth(phoneNumber);
+        pdf.text(phoneNumber, (pageWidth - phoneNumberWidth) / 2, y);
+        y += 20;
+        
+        // Reset text color
+        pdf.setTextColor(...grayColor);
+        
+        // Add a light blue background for the entire client/invoice info section
+        pdf.setFillColor(240, 248, 255); // Very light blue
+        pdf.rect(margin - 5, y - 5, pageWidth - 2 * (margin - 5), 50, 'F');
+        
+        // Draw a border around the section
+        pdf.setDrawColor(...primaryColor);
+        pdf.setLineWidth(0.5);
+        pdf.rect(margin - 5, y - 5, pageWidth - 2 * (margin - 5), 50);
+        
+        // Client and invoice info section - better spacing and styling
+        const boxHeight = 40;
+        
+        // Client info box - now just text, not a separate box
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(...primaryColor);
+        pdf.text("Bill To:", margin, y + 10);
+        pdf.setTextColor(...grayColor);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(invoice.clientName, margin, y + 20);
+        
+        // Handle multi-line address with text wrapping
+        const addressLines = pdf.splitTextToSize(invoice.clientAddress, pageWidth/2 - margin - 10);
+        for (let i = 0; i < addressLines.length; i++) {
+            pdf.text(addressLines[i], margin, y + 30 + (i * 10));
+        }
+        
+        // Invoice info - right aligned with less space between label and value
+        pdf.setFont('helvetica', 'bold');
+        pdf.setTextColor(...primaryColor);
+ 
+        // Calculate positions for labels and values
+        const invoiceLabel = "Invoice #:";
+        const dateLabel = "Date:";
+        const labelX = pageWidth - margin - 100;
+ 
+        // Draw labels
+        pdf.text(invoiceLabel, labelX, y + 10);
+        pdf.text(dateLabel, labelX, y + 25);
+ 
+        // Calculate width of labels and position values with minimal spacing
+        const invoiceLabelWidth = pdf.getTextWidth(invoiceLabel);
+        const dateLabelWidth = pdf.getTextWidth(dateLabel);
+ 
+        // Even less space between labels and values (just 2 units)
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...grayColor);
+        pdf.text(invoice.invoiceNumber, labelX + invoiceLabelWidth + 2, y + 10);
+        pdf.text(formatDate(invoice.date), labelX + dateLabelWidth + 2, y + 25);
+        
+        y += boxHeight + 20;
+        
+        // Add gradient background for the items table
+        const tableStartY = y;
+        // Light gradient background for items section
+        pdf.setFillColor(...bgLight);
+        pdf.rect(margin - 5, y - 5, pageWidth - 2 * (margin - 5), 
+                 invoice.items.length * 15 + 40, 'F');
+        
+        // Items table header with better styling
+        pdf.setFillColor(...primaryColor);
+        pdf.setTextColor(255, 255, 255); // White text
+        pdf.rect(margin - 5, y - 5, pageWidth - 2 * (margin - 5), 15, 'F');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.text("Description", margin + 5, y + 5);
+        pdf.text("Amount", pageWidth - margin - 15, y + 5, { align: 'right' });
+        
+        y += 15;
+        
+        // Items with better styling
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(...grayColor);
+        let totalAmount = 0;
+        
+        invoice.items.forEach((item, index) => {
+            // Alternating row background
+            if (index % 2 === 0) {
+                pdf.setFillColor(245, 245, 245); // Lighter alternating rows
+            } else {
+                pdf.setFillColor(255, 255, 255); // White rows
+            }
+            
+            // Calculate row height based on description length
+            const descriptionLines = pdf.splitTextToSize(item.description, pageWidth - 2 * margin - 60);
+            const rowHeight = Math.max(15, descriptionLines.length * 10);
+            
+            // Draw taller background for multiline descriptions
+            pdf.rect(margin - 5, y - 5, pageWidth - 2 * (margin - 5), rowHeight, 'F');
+            
+            // Item text with multiline support
+            pdf.text(descriptionLines, margin + 5, y + 5);
+            const amount = parseFloat(item.amount).toFixed(2);
+            
+            // Color amounts in accent color (aligned to the top of the row for consistency)
+            pdf.setTextColor(...accentColor);
+            pdf.text('$' + amount, pageWidth - margin - 5, y + 5, { align: 'right' });
+            pdf.setTextColor(...grayColor);
+            
+            totalAmount += parseFloat(item.amount);
+            y += rowHeight; // Adjust y position based on row height
+        });
+        
+        // Draw a line above the total
+        pdf.setDrawColor(...primaryColor);
+        pdf.setLineWidth(0.5);
+        pdf.line(pageWidth/2, y, pageWidth - margin, y);
+        
+        // Total with better styling
+        y += 10;
+        pdf.setFillColor(...bgMedium);
+        pdf.rect(pageWidth/2, y - 5, pageWidth/2 - margin, 20, 'F');
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(14);
+        pdf.setTextColor(...primaryColor);
+        pdf.text("Total:", pageWidth/2 + 10, y + 8);
+        
+        // Total amount with accent color
+        pdf.setTextColor(...accentColor);
+        pdf.text('$' + totalAmount.toFixed(2), pageWidth - margin - 5, y + 8, { align: 'right' });
+        
+        y += 30;
+        
+        // Thank you note with better styling
+        pdf.setFillColor(240, 248, 255); // Light blue
+        pdf.roundedRect(margin - 5, y - 5, pageWidth - 2 * (margin - 5), 35, 5, 5, 'F');
+        pdf.setDrawColor(...primaryColor);
+        pdf.roundedRect(margin - 5, y - 5, pageWidth - 2 * (margin - 5), 35, 5, 5);
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(12);
+        pdf.setTextColor(...primaryColor);
+        pdf.text("Thank you for your business!", pageWidth / 2, y + 10, { align: 'center' });
+        pdf.setFontSize(10);
+        pdf.setTextColor(...grayColor);
+        pdf.text("Please make checks payable to: Precision Handyman Solutions, LLC.", pageWidth / 2, y + 25, { align: 'center' });
+        
+        // Save the PDF
+        console.log("Saving PDF...");
+        pdf.save(`invoice-${invoice.invoiceNumber}.pdf`);
+        console.log("PDF saved successfully");
+        
+    } catch (error) {
+        console.error("Error in downloadInvoice:", error);
+        alert("There was a problem creating the PDF. Please try again.");
+    }
+}
+
+// Helper function to convert an image to Base64
+async function getBase64Image(imgPath) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous'; // Helps with CORS issues
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            // Get the data URL as PNG
+            try {
+                const dataURL = canvas.toDataURL('image/png');
+                resolve(dataURL);
+            } catch (e) {
+                reject(e);
+            }
+        };
+        
+        img.onerror = function(e) {
+            console.error("Image load error", e);
+            reject(new Error("Image load failed"));
+        };
+        
+        // Set source path - make sure it's the complete path
+        img.src = imgPath;
+        
+        // Handle cases where the image might be cached
+        if (img.complete || img.complete === undefined) {
+            img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+            setTimeout(() => {
+                img.src = imgPath;
+            }, 0);
+        }
+    });
 }
 
 function generateInvoice() {
@@ -435,15 +641,23 @@ function generateInvoice() {
     const items = [];
 
     document.querySelectorAll('.item-row').forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const description = inputs[0].value;
-        const amount = parseFloat(inputs[1].value.replace(/[^0-9.-]+/g, ''));
+        // Updated to handle textarea for description
+        const description = row.querySelector('textarea') 
+            ? row.querySelector('textarea').value 
+            : row.querySelector('input[placeholder="Description"]').value;
+            
+        const amountInput = row.querySelector('input[placeholder="Amount"]');
+        const amount = parseFloat(amountInput.value.replace(/[^0-9.-]+/g, ''));
 
         if (description && !isNaN(amount)) {
             const tr = document.createElement('tr');
             tr.className = 'border-b';
+            
+            // Handle possible multiline description with line breaks
+            const descriptionHTML = description.replace(/\n/g, '<br>');
+            
             tr.innerHTML = `
-                <td class="py-2">${description}</td>
+                <td class="py-2">${descriptionHTML}</td>
                 <td class="text-right py-2">$${amount.toFixed(2)}</td>
             `;
             previewItems.appendChild(tr);
@@ -470,6 +684,7 @@ function generateInvoice() {
     saveInvoice(invoiceData);
 }
 
+// Function to close preview
 function closePreview() {
     document.getElementById('previewOverlay').classList.remove('show');
     document.getElementById('invoicePreview').classList.remove('show');
@@ -488,10 +703,15 @@ function formatDate(dateString) {
 }
 
 // Register service worker for PWA
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && 
+    (window.location.protocol === 'https:' || 
+     window.location.hostname === 'localhost' || 
+     window.location.hostname === '127.0.0.1')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js')
       .then(reg => console.log('Service worker registered.', reg))
       .catch(err => console.error('Service worker registration failed:', err));
   });
+} else {
+  console.log('Service Worker is not supported when running directly from file system. Use a web server for testing PWA features.');
 } 
