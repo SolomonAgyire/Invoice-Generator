@@ -321,6 +321,9 @@ function renderModalInvoicePreview(invoice) {
             <button onclick="downloadInvoice(${invoice.id})" class="btn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
                 Download
             </button>
+            <button onclick="document.getElementById('invoicePreviewModal').classList.add('hidden')" class="btn bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+                Close
+            </button>
         </div>
     `;
 }

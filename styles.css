@@ -547,6 +547,25 @@ input:focus {
         flex-direction: column;
         text-align: center;
     }
+    
+    #invoicePreview {
+        width: 90%;
+        height: 300px;
+        max-width: 350px;
+    }
+    
+    .preview-content {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .preview-content table {
+        font-size: 0.85rem;
+    }
+    
+    .preview-header {
+        padding: 8px;
+    }
 }
 
 /* Navbar Enhancement */
